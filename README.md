@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # IceDrive Directory service template
 
 This repository contains the project template for the Directory service proposed as laboratory work for the students
@@ -12,6 +11,6 @@ One of the first things that you need to setup when you clone this branch is to 
 - Project authors
 - Project dependencies
 - Projects URL humepage
+
 =======
 # LabSSDD
->>>>>>> 30b1eea7056e58baad9c9dfd0f97b12dc8563a66

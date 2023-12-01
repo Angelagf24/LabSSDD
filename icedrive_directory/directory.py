@@ -14,6 +14,8 @@ class Directory(IceDrive.Directory):
         self.files = {}
 
     def getParent(self, current: Ice.Current = None) -> IceDrive.DirectoryPrx:
+        if not self.parent:
+            raise IceDrive.RootHasNoParent()
         return self.parent
 
     def getChilds(self, current: Ice.Current = None) -> List[str]:
@@ -69,8 +71,6 @@ class Directory(IceDrive.Directory):
         return "/".join(path)
 
 
-# Puedes inicializar aquí alguna estructura de datos para mapear usuarios a directorios raíz.
-# Por ejemplo, un diccionario donde las claves son usuarios y los valores son instancias de Directorio.
 class DirectoryService(IceDrive.DirectoryService):
     def __init__(self):
         self.user_roots = {}

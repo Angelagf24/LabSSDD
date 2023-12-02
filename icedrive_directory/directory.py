@@ -1,6 +1,10 @@
 """Module for servants implementations."""
 
 from typing import List
+import os
+from uuid import uuid4
+import uuid
+import configparser
 
 import Ice
 
@@ -74,6 +78,28 @@ class Directory(IceDrive.Directory):
 class DirectoryService(IceDrive.DirectoryService):
     def __init__(self):
         self.user_roots = {}
+        self.proxy_file_path = 'proxy.txt'
+        self.fixed_identity = str(uuid.uuid4())
+
+        self.config_file_path = 'config.properties'
+        # Cargar la configuración al iniciar el servicio
+        self.load_configuration()
+
+        # Cargar el proxy al iniciar el servicio, si existe
+        if os.path.exists(self.proxy_file_path):
+            self.load_proxy()
+
+    def load_configuration(self):
+        config = configparser.ConfigParser()
+        config.read(self.config_file_path)
+        # Lee la configuración desde el archivo y expande la ruta del directorio personal
+        self.state_directory = config.get('directory', 'state.path', fallback='default_directory')
+        self.expanded_directory = os.path.expanduser(self.state_directory)
+
+        # Verificar y crear el directorio si no existe
+        if not os.path.exists(self.expanded_directory):
+            os.makedirs(self.expanded_directory)
+
 
     def getRoot(self, user: str, current=None) -> IceDrive.DirectoryPrx:
         # Verifica si ya existe un directorio raíz para el usuario.
@@ -83,4 +109,28 @@ class DirectoryService(IceDrive.DirectoryService):
             # Si no existe, crea uno nuevo y lo asocia al usuario.
             root_directory = Directory(name=f"root_{user}")
             self.user_roots[user] = root_directory
+
+            # Guardar el proxy en un archivo
+            self.save_proxy(root_directory, self.fixed_identity)
+
             return root_directory
+
+    def save_proxy(self, proxy, identity):
+        identity_str = Ice.uncheckedCast(identity, Ice.Identity).ice_toString()
+        endpoint = proxy.ice_getCommunicator().proxyToString(proxy)
+        with open(os.path.join(self.state_directory, 'proxy.txt'), 'w') as file:
+            file.write(f"{identity_str}:{endpoint}")
+
+    def load_proxy(self):
+        try:
+            with open(os.path.join(self.state_directory, 'proxy.txt'), 'r') as file:
+                proxy_info = file.read().split(":")
+                if len(proxy_info) != 2:
+                    raise ValueError("El formato del archivo proxy es incorrecto.")
+                identity_str = proxy_info[0]
+                endpoint = proxy_info[1]
+                identity = Ice.stringToIdentity(identity_str)
+                proxy = self.communicator().stringToProxy(f"{identity}:tcp -h {endpoint}")
+                # Utiliza el proxy cargado según sea necesario
+        except ValueError as e:
+            print(f"Error al cargar el proxy: {e}")

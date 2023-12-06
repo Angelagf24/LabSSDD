@@ -90,7 +90,6 @@ class DirectoryService(IceDrive.DirectoryService):
         if os.path.exists(self.proxy_file_path):
             self.load_proxy()
 
-
     def load_configuration(self):
         self.config_file_path = 'config/config.json'
         if os.path.exists(self.config_file_path):
@@ -152,3 +151,4 @@ class DirectoryService(IceDrive.DirectoryService):
                 # Utiliza el proxy cargado según sea necesario
         except (ValueError, KeyError) as e:
             print(f"Error al cargar el proxy: {e}")
+        

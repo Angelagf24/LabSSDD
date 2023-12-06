@@ -1,76 +1,39 @@
-import unittest
-from directory import Directory  # Asegúrate de importar correctamente la clase Directory
-import IceDrive
 import Ice
+import sys
+import os
 
-#from IceDrive import FileNotFound, FileAlreadyExists, ChildNotExists
+Ice.loadSlice('../icedrive_directory/icedrive.ice')
+import IceDrive
 
+sys.path.append('../icedrive_directory')
+from directory import DirectoryService, Directory
 
-class TestDirectory(unittest.TestCase):
-    #Este método configura el entorno de prueba creando un directorio raíz y subdirectorios, 
-    #además de agregar algunos archivos. Esto se utiliza como base para varias pruebas.
-    def setUp(self):
-        # Configuración inicial para las pruebas.
-        self.root = Directory("root")
-        self.subdir = self.root.createChild("subdir")
-        self.root.linkFile("file1", "blobId1")
-        self.subdir.linkFile("file2", "blobId2")
+def test_directory_service(proxy):
+    with Ice.initialize(sys.argv) as communicator:
+        proxy_service = communicator.stringToProxy(proxy)
+        directory_service = IceDrive.DirectoryServicePrx.checkedCast(proxy_service)
 
-    def test_getFiles_empty(self):
-        # Prueba obtener archivos de un directorio vacío
-        empty_dir = self.root.createChild("empty")
-        self.assertEqual(empty_dir.getFiles(), [])
+        if directory_service:
+            try:
+                user_root = directory_service.getRoot("usuario_prueba")
+                root = IceDrive.DirectoryPrx.checkedCast(user_root)
 
-    def test_getFiles_nonEmpty(self):
-        # Prueba obtener archivos en un directorio no vacío
-        self.assertEqual(set(self.root.getFiles()), {"file1"})
+                # Imprimir la ruta del directorio raíz
+                print(root.getPath())
+            except Exception as e:
+                print(f"Error durante las pruebas: {e}")
+        else:
+            print("Error: No se pudo obtener el servicio de directorio.")
 
-    def test_getBlobId(self):
-        # Prueba obtener el blobId de un archivo existente
-        self.assertEqual(self.root.getBlobId("file1"), "blobId1")
-
-    def test_getBlobId_notFound(self):
-        # Prueba la excepción cuando el archivo no existe
-        with self.assertRaises(IceDrive.FileNotFound):
-            self.root.getBlobId("nonExistingFile")
-
-    def test_linkFile_existingFile(self):
-        # Prueba la creación de un archivo que ya existe
-        with self.assertRaises(IceDrive.FileAlreadyExists):
-            self.root.linkFile("file1", "blobId1")
-
-    def test_unlinkFile(self):
-        # Prueba eliminar un archivo existente
-        self.root.unlinkFile("file1")
-        with self.assertRaises(IceDrive.FileNotFound):
-            self.root.getBlobId("file1")
-
-    def test_getChilds(self):
-        # Prueba obtener subdirectorios
-        self.assertEqual(set(self.root.getChilds()), {"subdir"})
-
-    def test_getChild_notExists(self):
-        # Prueba obtener un subdirectorio que no existe
-        with self.assertRaises(IceDrive.ChildNotExists):
-            self.root.getChild("nonExistingSubdir")
-
-    def test_createChild_existingChild(self):
-        # Prueba crear un subdirectorio que ya existe
-        with self.assertRaises(IceDrive.ChildAlreadyExists):
-            self.root.createChild("subdir")
-
-    def test_removeChild_notExists(self):
-        # Prueba eliminar un subdirectorio que no existe
-        with self.assertRaises(IceDrive.ChildNotExists):
-            self.root.removeChild("nonExistingSubdir")
-
-    def test_getParent(self):
-        # Prueba obtener el directorio padre
-        self.assertEqual(self.subdir.getParent(), self.root)
-
-    def test_getParent_root(self):
-        # Prueba obtener el directorio padre de la raíz
-        self.assertIsNone(self.root.getParent())
+def tearDown(self):
+    # Limpia después de las pruebas
+    self.communicator.destroy()
 
 if __name__ == '__main__':
-    unittest.main()
+
+    if len(sys.argv) < 2:
+        print("Uso: test_directory.py <proxy del servicio>")
+        sys.exit(1)
+    
+    proxy = sys.argv[1]
+    test_directory_service(proxy)

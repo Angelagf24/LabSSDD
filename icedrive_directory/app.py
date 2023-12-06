@@ -6,7 +6,7 @@ from typing import List
 
 import Ice
 
-from .directory import Directory
+from .directory import DirectoryService
 
 
 class DirectoryApp(Ice.Application):
@@ -18,7 +18,7 @@ class DirectoryApp(Ice.Application):
         adapter.activate()
 
         #Creamos una instancia de la clase Directory para representar el directorio raíz.
-        servant = Directory(name="root_directory")
+        servant = DirectoryService(adapter)
         servant_proxy = adapter.addWithUUID(servant)
 
         logging.info("Proxy: %s", servant_proxy)

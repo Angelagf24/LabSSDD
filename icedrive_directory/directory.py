@@ -3,9 +3,8 @@
 from typing import List
 import os
 import json
-from uuid import uuid4
-import uuid
-import configparser
+import sys
+import atexit
 
 import Ice
 
@@ -77,78 +76,70 @@ class Directory(IceDrive.Directory):
 
 #Persistencia con JSON
 class DirectoryService(IceDrive.DirectoryService):
-    def __init__(self):
+    def __init__(self, adapter):
         self.user_roots = {}
-        self.proxy_file_path = 'proxy.json'
-        self.fixed_identity = str(uuid4())
-        self.config_file_path = 'config.json'
+        self.adapter = adapter
 
-        # Cargar la configuración al iniciar el servicio
-        self.load_configuration()
+        # Directorio para almacenar el estado
+        self.state_directory = "state_data"
 
-        # Cargar el proxy al iniciar el servicio, si existe
-        if os.path.exists(self.proxy_file_path):
-            self.load_proxy()
+        # Crear el directorio si no existe
+        os.makedirs(self.state_directory, exist_ok=True)
 
-    def load_configuration(self):
-        self.config_file_path = 'config/config.json'
-        if os.path.exists(self.config_file_path):
-            with open(self.config_file_path, 'r') as file:
-                self.configuration = json.load(file)
-        else:
-            # Configuración por defecto si el archivo no existe
-            self.configuration = {
-                'directory': {
-                    'state.path': 'default_directory'
-                }
-            }
+        # Cargar el estado desde un archivo JSON si existe
+        self.load_state()
 
-    def save_configuration(self):
-        with open(self.config_file_path, 'w') as file:
-            json.dump(self.configuration, file, indent=2)
+        atexit.register(self.save_state)
+    
+    def load_state(self):
+        state_file_path = os.path.join(self.state_directory, "service_state.json")
+        try:
+            with open(state_file_path, "r") as json_file:
+                state = json.load(json_file)
 
+                # Deserializar los proxies utilizando el comunicador
+                self.user_roots = {user: self.communicator.stringToProxy(proxy_str)
+                                for user, proxy_str in state["user_roots"].items()}
+        except FileNotFoundError:
+            pass  # El archivo no existe aún
+        except Exception as e:
+           pass
 
-    def get_configuration_value(self, section, key, fallback=None):
-        return self.configuration.get(section, {}).get(key, fallback)
+    def save_state(self):
+        state_file_path = os.path.join(self.state_directory, "service_state.json")
+        print(f"Intentando guardar el estado en: {state_file_path}")
 
-    def set_configuration_value(self, section, key, value):
-        if section not in self.configuration:
-            self.configuration[section] = {}
-        self.configuration[section][key] = value
-        self.save_configuration()
+        try:
+            state = {"user_roots": {user: str(proxy) for user, proxy in self.user_roots.items()}}
+
+            # Cambio aquí: usar modo "w" para sobrescribir
+            with open(state_file_path, "w") as json_file:
+                json.dump(state, json_file)
+
+            print("Estado guardado exitosamente.")
+        except Exception as e:
+            print(f"Error al guardar el estado: {e}")
+        finally:
+            print("Fin del intento de guardar el estado.")
 
     def getRoot(self, user: str, current=None) -> IceDrive.DirectoryPrx:
-        # Verifica si ya existe un directorio raíz para el usuario.
-        if user in self.user_roots:
-            return self.user_roots[user]
-        else:
-            # Si no existe, crea uno nuevo y lo asocia al usuario.
-            root_directory = Directory(name=f"root_{user}")
-            self.user_roots[user] = root_directory
-
-            # Guardar el proxy en un archivo
-            self.save_proxy(root_directory, self.fixed_identity)
-
-            return root_directory
-
-    def save_proxy(self, proxy, identity):
-        identity_str = Ice.uncheckedCast(identity, Ice.Identity).ice_toString()
-        endpoint = proxy.ice_getCommunicator().proxyToString(proxy)
-
-        data = {"identity": identity_str, "endpoint": endpoint}
-
-        with open(self.proxy_file_path, 'w') as file:
-            json.dump(data, file)
-
-    def load_proxy(self):
+        print(f"Intentando obtener el directorio raíz para el usuario: {user}")
         try:
-            with open(self.proxy_file_path, 'r') as file:
-                loaded_data = json.load(file)
-                identity_str = loaded_data["identity"]
-                endpoint = loaded_data["endpoint"]
-                identity = Ice.stringToIdentity(identity_str)
-                proxy = self.communicator().stringToProxy(f"{identity}:tcp -h {endpoint}")
-                # Utiliza el proxy cargado según sea necesario
-        except (ValueError, KeyError) as e:
-            print(f"Error al cargar el proxy: {e}")
-        
+            # Verificar si el proxy ya existe y es válido
+            if user in self.user_roots:
+                proxy = self.user_roots[user]
+                if proxy.ice_isA("::IceDrive::DirectoryPrx"):
+                    print("El usuario ya esta creado.")
+                    return proxy
+                else:
+                    print(f"Proxy no válido para el usuario: {user}")
+
+            # Crear un nuevo proxy si no existe
+            return self.user_roots.setdefault(
+                user,
+                IceDrive.DirectoryPrx.uncheckedCast(
+                    self.adapter.addWithUUID(Directory(name=f"root_{user}"))
+                ),
+            )
+        except Exception as e:
+            print(f"Error al obtener el directorio raíz para el usuario {user}: {e}")

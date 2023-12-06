@@ -2,6 +2,7 @@
 
 from typing import List
 import os
+import json
 from uuid import uuid4
 import uuid
 import configparser
@@ -74,14 +75,14 @@ class Directory(IceDrive.Directory):
             current_dir = current_dir.parent
         return "/".join(path)
 
-
+#Persistencia con JSON
 class DirectoryService(IceDrive.DirectoryService):
     def __init__(self):
         self.user_roots = {}
-        self.proxy_file_path = 'proxy.txt'
-        self.fixed_identity = str(uuid.uuid4())
+        self.proxy_file_path = 'proxy.json'
+        self.fixed_identity = str(uuid4())
+        self.config_file_path = 'config.json'
 
-        self.config_file_path = 'config.properties'
         # Cargar la configuración al iniciar el servicio
         self.load_configuration()
 
@@ -89,17 +90,33 @@ class DirectoryService(IceDrive.DirectoryService):
         if os.path.exists(self.proxy_file_path):
             self.load_proxy()
 
+
     def load_configuration(self):
-        config = configparser.ConfigParser()
-        config.read(self.config_file_path)
-        # Lee la configuración desde el archivo y expande la ruta del directorio personal
-        self.state_directory = config.get('directory', 'state.path', fallback='default_directory')
-        self.expanded_directory = os.path.expanduser(self.state_directory)
+        self.config_file_path = 'config/config.json'
+        if os.path.exists(self.config_file_path):
+            with open(self.config_file_path, 'r') as file:
+                self.configuration = json.load(file)
+        else:
+            # Configuración por defecto si el archivo no existe
+            self.configuration = {
+                'directory': {
+                    'state.path': 'default_directory'
+                }
+            }
 
-        # Verificar y crear el directorio si no existe
-        if not os.path.exists(self.expanded_directory):
-            os.makedirs(self.expanded_directory)
+    def save_configuration(self):
+        with open(self.config_file_path, 'w') as file:
+            json.dump(self.configuration, file, indent=2)
 
+
+    def get_configuration_value(self, section, key, fallback=None):
+        return self.configuration.get(section, {}).get(key, fallback)
+
+    def set_configuration_value(self, section, key, value):
+        if section not in self.configuration:
+            self.configuration[section] = {}
+        self.configuration[section][key] = value
+        self.save_configuration()
 
     def getRoot(self, user: str, current=None) -> IceDrive.DirectoryPrx:
         # Verifica si ya existe un directorio raíz para el usuario.
@@ -118,19 +135,20 @@ class DirectoryService(IceDrive.DirectoryService):
     def save_proxy(self, proxy, identity):
         identity_str = Ice.uncheckedCast(identity, Ice.Identity).ice_toString()
         endpoint = proxy.ice_getCommunicator().proxyToString(proxy)
-        with open(os.path.join(self.state_directory, 'proxy.txt'), 'w') as file:
-            file.write(f"{identity_str}:{endpoint}")
+
+        data = {"identity": identity_str, "endpoint": endpoint}
+
+        with open(self.proxy_file_path, 'w') as file:
+            json.dump(data, file)
 
     def load_proxy(self):
         try:
-            with open(os.path.join(self.state_directory, 'proxy.txt'), 'r') as file:
-                proxy_info = file.read().split(":")
-                if len(proxy_info) != 2:
-                    raise ValueError("El formato del archivo proxy es incorrecto.")
-                identity_str = proxy_info[0]
-                endpoint = proxy_info[1]
+            with open(self.proxy_file_path, 'r') as file:
+                loaded_data = json.load(file)
+                identity_str = loaded_data["identity"]
+                endpoint = loaded_data["endpoint"]
                 identity = Ice.stringToIdentity(identity_str)
                 proxy = self.communicator().stringToProxy(f"{identity}:tcp -h {endpoint}")
                 # Utiliza el proxy cargado según sea necesario
-        except ValueError as e:
+        except (ValueError, KeyError) as e:
             print(f"Error al cargar el proxy: {e}")

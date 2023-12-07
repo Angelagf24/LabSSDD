@@ -11,11 +11,12 @@ import Ice
 import IceDrive
 
 class Directory(IceDrive.Directory):
-    def __init__(self, name, parent=None):
+    def __init__(self, name, parent=None, adapter=None):
         self.name = name
         self.parent = parent
         self.childs = {}
         self.files = {}
+        self.adapter = adapter
 
     def getParent(self, current: Ice.Current = None) -> IceDrive.DirectoryPrx:
         if not self.parent:
@@ -27,15 +28,16 @@ class Directory(IceDrive.Directory):
 
     def getChild(self, name: str, current: Ice.Current = None) -> IceDrive.DirectoryPrx:
         if name in self.childs:
-            return self.childs[name]
+            proxy = IceDrive.DirectoryPrx.checkedCast(self.childs[name])
+            return proxy
         else:
-            raise IceDrive.ChildNotExists(childName=name, path=self.getPath())
+            raise IceDrive.ChildNotExists(childName=name)
 
     def createChild(self, name: str, current: Ice.Current = None) -> IceDrive.DirectoryPrx:
         if name not in self.childs:
             child = Directory(name, parent=self)
             self.childs[name] = child
-            return child
+            return IceDrive.DirectoryPrx.checkedCast(self.adapter.addWithUUID(child))
         else:
             raise IceDrive.ChildAlreadyExists(childName=name, path=self.getPath())
 
@@ -77,7 +79,7 @@ class Directory(IceDrive.Directory):
 #Persistencia con JSON
 class DirectoryService(IceDrive.DirectoryService):
     def __init__(self, adapter, communicator):
-        self.user_addresses = {}
+        self.directory_info = {}
         self.adapter = adapter
         self.communicator = communicator
 
@@ -94,7 +96,7 @@ class DirectoryService(IceDrive.DirectoryService):
         print(f"Intentando guardar el estado en: {state_file_path}")
 
         try:
-            state = {"user_addresses": self.user_addresses}
+            state = {"directory_info": self.directory_info}
 
             with open(state_file_path, "w") as json_file:
                 json.dump(state, json_file)
@@ -111,11 +113,11 @@ class DirectoryService(IceDrive.DirectoryService):
             with open(state_file_path, "r") as json_file:
                 state = json.load(json_file)
 
-                # Limpiar user_addresses antes de cargar
-                self.user_addresses.clear()
+                # Limpiar directory_info antes de cargar
+                self.directory_info.clear()
 
-                # Actualizar user_addresses con los nuevos datos
-                self.user_addresses.update(state.get("user_addresses", {}))
+                # Actualizar directory_info con los nuevos datos
+                self.directory_info.update(state.get("directory_info", {}))
         except FileNotFoundError:
             pass
         except Exception as e:
@@ -125,34 +127,34 @@ class DirectoryService(IceDrive.DirectoryService):
         print(f"Intentando obtener el directorio raíz para el usuario: {user}")
         try:
             # Verificar si la dirección del proxy ya existe
-            if user in self.user_addresses:
-                address = self.user_addresses[user]
+            if user in self.directory_info:
+                root_proxy = self.directory_info[user]["root"]
                 try:
                     # Utilizar ice_invokeAsync para limitar el tiempo de espera
-                    async_result = self.communicator.stringToProxyAsync(address)
+                    async_result = self.communicator.stringToProxyAsync(root_proxy)
                     proxy = async_result.waitForResult(2000)  # Esperar máximo 2 segundos
 
                     if proxy and proxy.ice_isA("::IceDrive::DirectoryPrx"):
-                        print(f"El usuario {user} ya existe. Estado actual de self.user_addresses: {self.user_addresses}")
+                        print(f"El usuario {user} ya existe. Estado actual de self.directory_info: {self.directory_info}")
                         return proxy
                     else:
                         print(f"Proxy no válido para el usuario: {user}")
                 except Exception as e:
-                    del self.user_addresses[user]
+                    del self.directory_info[user]
                     pass
 
             # Crear un nuevo proxy si no existe
             new_proxy = IceDrive.DirectoryPrx.uncheckedCast(
-                self.adapter.addWithUUID(Directory(name=f"root_{user}"))
+                self.adapter.addWithUUID(Directory(name=f"root_{user}", adapter=self.adapter))
             )
 
-            # Almacenar solo la dirección del proxy
-            self.user_addresses[user] = str(new_proxy)
+            # Almacenar la dirección del proxy y la información del subdirectorio
+            self.directory_info[user] = {"root": str(new_proxy), "subdirectories": {}}
 
             # Guardar el estado actualizado
             self.save_state()
 
-            print(f"Nuevo proxy creado para el usuario {user}. Estado actual de self.user_addresses: {self.user_addresses}")
+            print(f"Nuevo proxy creado para el usuario {user}. Estado actual de self.directory_info: {self.directory_info}")
 
             return new_proxy
 

@@ -18,8 +18,11 @@ class DirectoryApp(Ice.Application):
         adapter.activate()
 
         #Creamos una instancia de la clase Directory para representar el directorio raíz.
-        servant = DirectoryService(adapter)
+        servant = DirectoryService(adapter, self.communicator())
         servant_proxy = adapter.addWithUUID(servant)
+
+        # Llamamos a load_state después de la creación
+        servant.load_state()
 
         logging.info("Proxy: %s", servant_proxy)
 

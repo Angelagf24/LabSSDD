@@ -18,27 +18,17 @@ def test_directory_service(proxy):
         directory_service = IceDrive.DirectoryServicePrx.checkedCast(proxy_service)
 
         # Caso 1: Obtener directorio raíz para un usuario que nunca lo ha solicitado anteriormente
-        """user1 = "usuario_nuevo"
-        root_directory_proxy2 = directory_service.getRoot(user1)
-        print(f"Directorio raíz para {user1}: {root_directory_proxy2}")"""
+        """user1 = "usuario1"
+        root_directory_proxy1 = directory_service.getRoot(user1)
+        print(f"Directorio raíz para {user1}: {root_directory_proxy1}")
 
-        existing_user = "usuario_existente"
+        user2= "usuario2"
+        root_directory_proxy2 = directory_service.getRoot(user2)
+        print(f"Directorio raíz para {user2}: {str(root_directory_proxy2)}")"""
 
-        # Obtener el directorio raíz para el usuario existente
-        root_directory_proxy = directory_service.getRoot(existing_user)
-        if root_directory_proxy:
-            print(f"Directorio raíz para {existing_user}: {str(root_directory_proxy)}")
-        else:
-            print(f"No se encontró el directorio raíz para {existing_user}")
-
-        existing_user2 = "usuario_existente2"
-
-        # Obtener el directorio raíz para el usuario existente
-        root_directory_proxy1 = directory_service.getRoot(existing_user2)
-        if root_directory_proxy:
-            print(f"Directorio raíz para {existing_user2}: {str(root_directory_proxy1)}")
-        else:
-            print(f"No se encontró el directorio raíz para {existing_user2}")
+        user3 = "usuario3"
+        root_directory_proxy3 = directory_service.getRoot(user3)
+        print(f"Directorio raíz para {user3}: {str(root_directory_proxy3)}")
 
 
 if __name__ == '__main__':

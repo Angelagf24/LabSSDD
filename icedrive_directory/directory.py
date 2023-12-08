@@ -4,7 +4,7 @@ from typing import List
 import os
 import json
 import sys
-import atexit
+import uuid
 
 import Ice
 
@@ -68,95 +68,68 @@ class Directory(IceDrive.Directory):
         else:
             raise IceDrive.FileNotFound(filename=filename)
 
-    def getPath(self, current: Ice.Current = None) -> str:
-        path = []
-        current_dir = self
-        while current_dir:
-            path.insert(0, current_dir.name)
-            current_dir = current_dir.parent
-        return "/".join(path)
 
 #Persistencia con JSON
 class DirectoryService(IceDrive.DirectoryService):
     def __init__(self, adapter, communicator):
-        self.directory_info = {}
+        self.directories = {}
         self.adapter = adapter
         self.communicator = communicator
 
-        # Directorio para almacenar el estado
-        self.state_directory = "state_data"
+        # Verificar si el archivo existe antes de cargar su contenido
+        file_path = 'directory_info.json'
+        if not os.path.exists(file_path):
+            # Si el archivo no existe, crea un diccionario vacío y guarda el archivo
+            directory_info = {'directory_info': {}}
+            with open(file_path, 'w') as file:
+                json.dump(directory_info, file, indent=2)
 
-        # Crear el directorio si no existe
-        os.makedirs(self.state_directory, exist_ok=True)
+    def getRoot(self, user, current=None):
+        user_uuid = self.get_user_uuid(user)
 
-        self.load_state()
+        # Verificar si el usuario ya tiene un directorio asignado
+        if user in self.directories:
+            print(f"El usuario '{user}' ya tiene un directorio asignado.")
+            return self.directories[user]
 
-    def save_state(self):
-        state_file_path = os.path.join(self.state_directory, "service_state.json")
-        print(f"Intentando guardar el estado en: {state_file_path}")
+        # Verificar si el usuario ya tiene un directorio registrado en el archivo JSON
+        file_path = 'directory_info.json'
+        with open(file_path, 'r') as file:
+            directory_info = json.load(file)
 
-        try:
-            state = {"directory_info": self.directory_info}
+        if user in directory_info['directory_info']:
+            # Si el usuario ya tiene un directorio registrado, recuperar el proxy y almacenarlo en la caché
+            stored_proxy_str = directory_info['directory_info'][user]['root']
+            stored_proxy = IceDrive.DirectoryPrx.uncheckedCast(self.communicator.stringToProxy(stored_proxy_str))
+            self.directories[user] = stored_proxy
+            print(f"El usuario '{user}' ya tiene un directorio registrado en el archivo JSON.")
+            return stored_proxy
 
-            with open(state_file_path, "w") as json_file:
-                json.dump(state, json_file)
+        # Si el usuario no tiene un directorio registrado, crear uno nuevo
+        directory_name = f"root_{user_uuid}"
+        new_proxy = IceDrive.DirectoryPrx.uncheckedCast(
+            self.adapter.addWithUUID(Directory(name=directory_name, adapter=self.adapter))
+        )
 
-            print("Estado guardado exitosamente.")
-        except Exception as e:
-            print(f"Error al guardar el estado: {e}")
-        finally:
-            print("Fin del intento de guardar el estado.")
+        self.directories[user] = new_proxy
+        self.persist_directory_info(user, new_proxy)
 
-    def load_state(self):
-        state_file_path = os.path.join(self.state_directory, "service_state.json")
-        try:
-            with open(state_file_path, "r") as json_file:
-                state = json.load(json_file)
+        return new_proxy
 
-                # Limpiar directory_info antes de cargar
-                self.directory_info.clear()
+    def get_user_uuid(self, user):
+        return str(uuid.uuid5(uuid.NAMESPACE_DNS, user))
 
-                # Actualizar directory_info con los nuevos datos
-                self.directory_info.update(state.get("directory_info", {}))
-        except FileNotFoundError:
-            pass
-        except Exception as e:
-            pass
+    def persist_directory_info(self, user, directory_proxy):
+        # Cargar la información existente
+        file_path = 'directory_info.json'
+        with open(file_path, 'r') as file:
+            directory_info = json.load(file)
 
-    def getRoot(self, user: str, current=None) -> IceDrive.DirectoryPrx:
-        print(f"Intentando obtener el directorio raíz para el usuario: {user}")
-        try:
-            # Verificar si la dirección del proxy ya existe
-            if user in self.directory_info:
-                root_proxy = self.directory_info[user]["root"]
-                try:
-                    # Utilizar ice_invokeAsync para limitar el tiempo de espera
-                    async_result = self.communicator.stringToProxyAsync(root_proxy)
-                    proxy = async_result.waitForResult(2000)  # Esperar máximo 2 segundos
+        # Actualizar la información con el nuevo directorio
+        directory_info.setdefault('directory_info', {})
+        directory_info['directory_info'].setdefault(user, {})
+        directory_info['directory_info'][user]['root'] = str(directory_proxy)
 
-                    if proxy and proxy.ice_isA("::IceDrive::DirectoryPrx"):
-                        print(f"El usuario {user} ya existe. Estado actual de self.directory_info: {self.directory_info}")
-                        return proxy
-                    else:
-                        print(f"Proxy no válido para el usuario: {user}")
-                except Exception as e:
-                    del self.directory_info[user]
-                    pass
-
-            # Crear un nuevo proxy si no existe
-            new_proxy = IceDrive.DirectoryPrx.uncheckedCast(
-                self.adapter.addWithUUID(Directory(name=f"root_{user}", adapter=self.adapter))
-            )
-
-            # Almacenar la dirección del proxy y la información del subdirectorio
-            self.directory_info[user] = {"root": str(new_proxy), "subdirectories": {}}
-
-            # Guardar el estado actualizado
-            self.save_state()
-
-            print(f"Nuevo proxy creado para el usuario {user}. Estado actual de self.directory_info: {self.directory_info}")
-
-            return new_proxy
-
-        except Exception as e:
-            print(f"Error al obtener el directorio raíz para el usuario {user}: {e}")
+        # Guardar la información actualizada en el archivo JSON
+        with open(file_path, 'w') as file:
+            json.dump(directory_info, file, indent=2)

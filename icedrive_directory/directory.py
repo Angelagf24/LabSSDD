@@ -23,9 +23,12 @@ class Directory(IceDrive.Directory):
         self.child_uuids = {}
 
     def getParent(self, current: Ice.Current = None) -> IceDrive.DirectoryPrx:
-        if not self.parent:
-            raise IceDrive.RootHasNoParent()
-        return self.parent
+        try:
+            if not self.parent:
+                raise IceDrive.RootHasNoParent()
+            return self.parent
+        except IceDrive.RootHasNoParent:
+            print("El directorio raíz no tiene un directorio superior (nodo raíz).")
 
     def get_name_uuid(self, name):
         return str(uuid.uuid5(uuid.NAMESPACE_DNS, name))
@@ -40,7 +43,7 @@ class Directory(IceDrive.Directory):
                 self.adapter.addWithUUID(child)
             )
         else:
-            print(f"Ese directorio '{name}' ya tiene existe.")
+            print(f"Ese directorio '{name}' ya existe.")
             raise IceDrive.ChildAlreadyExists(childName=name, path=self.getPath())
 
         self.child_directories[name] = child_proxy
@@ -83,14 +86,7 @@ class Directory(IceDrive.Directory):
 
     def getFiles(self, current: Ice.Current = None) -> List[str]:
         return list(self.files.keys())
-
-    def linkFile(self, filename: str, blob_id: str, current=None):
-        if filename not in self.files:
-            self.files[filename] = blob_id
-            self.persist(filename, blob_id)
-        else:
-            raise IceDrive.FileAlreadyExists(filename=filename)
-
+    
     def save_directory_data(self, file_path=None, filename=None, blob_id=None):
         # Utiliza la ruta proporcionada o la predeterminada si no se especifica
         file_path = file_path or self.subdirectory_path
@@ -109,10 +105,50 @@ class Directory(IceDrive.Directory):
             # Llama a save_directory_data con la ruta del subdirectorio
             self.parent.save_directory_data(file_path=self.subdirectory_path, filename=filename, blob_id=blob_id)
 
+    def linkFile(self, filename: str, blob_id: str, current=None):
+        if filename not in self.files:
+            self.files[filename] = blob_id
+            self.persist(filename, blob_id)
+        else:
+            raise IceDrive.FileAlreadyExists(filename=filename)
+        
+    def unlinkFile(self, filename: str, current: Ice.Current = None) -> None:
+        if filename in self.files:
+            del self.files[filename]
+            self.persistUnLink(filename)
+        else:
+            raise IceDrive.FileNotFound(filename=filename)
+        
+    def persistUnLink(self, filename):
+        if self.parent:
+            # Llama a remove_directory_data con la ruta del subdirectorio
+            self.parent.remove_directory_data(filename=filename, file_path=self.subdirectory_path)
+        
+    def remove_directory_data(self, filename, file_path=None):
+        file_path = file_path or self.subdirectory_path
+
+        # Verifica si el archivo JSON existe
+        if os.path.exists(file_path):
+            with open(file_path, 'r') as file:
+                data = json.load(file)
+
+            # Elimina la entrada correspondiente al archivo en el archivo JSON
+            if 'files' in data and filename in data['files']:
+                del data['files'][filename]
+
+                # Guarda la información actualizada en el archivo JSON
+                with open(file_path, 'w') as file:
+                    json.dump(data, file, indent=2)
+        
+    def getBlobId(self, filename: str, current: Ice.Current = None) -> str:
+        if filename in self.files:
+            return self.files[filename]
+        else:
+            raise IceDrive.FileNotFound(filename=filename)
+
+
     def getPath(self, current: Ice.Current = None) -> str:
         # Este método podría retornar la ruta del directorio actual
-        # Puedes personalizarlo según tus necesidades
-        # Aquí se muestra una posible implementación básica
         path = self.name
         current_directory = self.parent
 
@@ -138,7 +174,6 @@ class Directory(IceDrive.Directory):
         if os.path.exists(directory_path):
             os.remove(directory_path)
 
-    
 
 #Persistencia con JSON
 class DirectoryService(IceDrive.DirectoryService):

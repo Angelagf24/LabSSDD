@@ -11,7 +11,7 @@ import Ice
 import IceDrive
 
 class Directory(IceDrive.Directory):
-    def __init__(self, name, adapter=None, parent=None, proxy=None):
+    def __init__(self, name, adapter=None, parent=None, proxy=None, parent_proxy=None):
         self.name = name
         self.adapter = adapter
         self.proxy = proxy
@@ -21,12 +21,13 @@ class Directory(IceDrive.Directory):
         self.parent = parent  # Incluye el argumento parent
         self.subdirectory_path = None
         self.child_uuids = {}
+        self.parent_proxy = parent_proxy
 
     def getParent(self, current: Ice.Current = None) -> IceDrive.DirectoryPrx:
         try:
             if not self.parent:
                 raise IceDrive.RootHasNoParent()
-            return self.parent
+            return self.parent_proxy
         except IceDrive.RootHasNoParent:
             print("El directorio raíz no tiene un directorio superior (nodo raíz).")
 
@@ -45,6 +46,8 @@ class Directory(IceDrive.Directory):
         else:
             print(f"Ese directorio '{name}' ya existe.")
             raise IceDrive.ChildAlreadyExists(childName=name, path=self.getPath())
+        
+        self.parent_proxy = child.proxy
 
         self.child_directories[name] = child_proxy
         self.child_uuids[name] = subdirectory_uuid

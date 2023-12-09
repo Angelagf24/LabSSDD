@@ -118,10 +118,10 @@ if __name__ == '__main__':
         sys.exit(1)
     
     proxy = sys.argv[1]
-    #test_persistence_get_Root(proxy)
-    #test_persistence_subdirectorios(proxy)
-    #test_persistence_borrado(proxy)
-    #test_persistence_unLink(proxy)
-    #test_persistence_getParent(proxy)
+    test_persistence_get_Root(proxy)
+    test_persistence_subdirectorios(proxy)
+    test_persistence_borrado(proxy)
+    test_persistence_unLink(proxy)
+    test_persistence_getParent(proxy)
 
     

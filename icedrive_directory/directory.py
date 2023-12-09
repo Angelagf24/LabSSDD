@@ -11,97 +11,96 @@ import Ice
 import IceDrive
 
 class Directory(IceDrive.Directory):
-    def __init__(self, name, adapter=None, parent=None):
+    def __init__(self, name, adapter=None, parent=None, proxy=None):
         self.name = name
         self.adapter = adapter
+        self.proxy = proxy
         self.child_directories = {}  # Directorios hijos
         self.linked_files = {}  # Archivos enlazados
         self.files = {}  # Agrega este atributo
         self.parent = parent  # Incluye el argumento parent
+        self.subdirectory_path = None
 
-        # Cargar la información persistente
-        self.load_persistence()
+    def get_name_uuid(self, name):
+        return str(uuid.uuid5(uuid.NAMESPACE_DNS, name))
+    
+    def createChild(self, name: str, current: Ice.Current = None) -> IceDrive.DirectoryPrx:
+        subdirectory_uuid = self.get_name_uuid(name)
 
-    def load_persistence(self):
-        # Crear un archivo de persistencia para cada directorio
-        directory_path = os.path.join('Subdirectorios', f"{self.name}_info.json")
+        if name not in self.child_directories:
+            subdirectory_name = f"{subdirectory_uuid}"
+            child = Directory(name=subdirectory_name, parent=self)
+            child_proxy = IceDrive.DirectoryPrx.uncheckedCast(
+                self.adapter.addWithUUID(child)
+            )
+        else:
+            print(f"Ese directorio '{name}' ya tiene existe.")
+            raise IceDrive.ChildAlreadyExists(childName=name, path=self.getPath())
 
-        if os.path.exists(directory_path):
-            with open(directory_path, 'r') as file:
-                directory_info = json.load(file)
-                self.child_directories = directory_info.get('child_directories', {})
-                self.linked_files = directory_info.get('linked_files', {})
+        self.child_directories[name] = child_proxy
 
-                # Cargar información de subdirectorios recursivamente
-                for dir_name, dir_info in self.child_directories.items():
-                    subdirectory = Directory(dir_name, parent=self)
-                    subdirectory.load_persistence()
-                    self.child_directories[dir_name] = subdirectory
+        self.persist_subdirectory_info(child, child_proxy, name)
 
-    def persist(self):
-        # Crear un archivo de persistencia para cada directorio
-        directory_path = os.path.join('Subdirectorios', f"{self.name}_info.json")
-        directory_info = {
-            'child_directories': {},
-            'linked_files': self.linked_files
-        }
+        self.subdirectory_path = os.path.join('Subdirectorios', f'{name}_info.json')
 
-        # Guardar información de subdirectorios recursivamente
-        for dir_name, subdirectory in self.child_directories.items():
-            subdirectory.persist()
-            directory_info['child_directories'][dir_name] = {
-                'child_directories': {},
-                'linked_files': subdirectory.linked_files
-            }
+        return child_proxy
+        
+    def persist_subdirectory_info(self, child, child_proxy, name):
+        directory_path = os.path.join('Subdirectorios', f'{name}_info.json')
 
+        if not os.path.exists(directory_path):
+            with open(directory_path, 'w') as file:
+                json.dump({'subdirectory_info': {}}, file, indent=2)
+
+        with open(directory_path, 'r') as file:
+            subdirectory_info = json.load(file)
+
+        # Actualizar la información con el nuevo directorio
+        subdirectory_info.setdefault('subdirectory_info', {})
+        subdirectory_info['subdirectory_info']['subdirectories'] = str(child_proxy)
+
+        # Guardar la información actualizada en el archivo JSON
         with open(directory_path, 'w') as file:
-            json.dump(directory_info, file, indent=2)
+            json.dump(subdirectory_info, file, indent=2)
 
-
-    def persist_after_creation(self):
-        # Llama al método persist después de crear un nuevo directorio raíz
-        self.persist()
     
     def getChilds(self, current: Ice.Current = None) -> List[str]:
         return list(self.child_directories.keys())
     
-    def getChild(self, name: str, current: Ice.Current = None) -> IceDrive.DirectoryPrx:
-        if name in self.child_directories:
-            proxy = IceDrive.DirectoryPrx.checkedCast(self.child_directories[name])
+    def getChild(self, target_name: str, current: Ice.Current = None) -> IceDrive.DirectoryPrx:
+        if target_name in self.child_directories:
+            proxy = IceDrive.DirectoryPrx.checkedCast(self.child_directories[target_name])
             return proxy
         else:
-            raise IceDrive.ChildNotExists(childName=name)
-
-    def createChild(self, name: str, current: Ice.Current = None) -> IceDrive.DirectoryPrx:
-        if name not in self.child_directories:
-            child = Directory(name, parent=self)
-
-            # Crear la identidad del objeto manualmente
-            child_identity = Ice.Identity(name, str(uuid.uuid4()))
-
-            # Registrar el objeto en el adaptador con su identidad
-            self.adapter.addWithUUID(child, child_identity)
-
-            # Obtener un proxy con la identidad del objeto
-            child_proxy = IceDrive.DirectoryPrx.uncheckedCast(self.adapter.createProxy(child_identity))
-
-            # Almacenar el proxy en self.child_directories
-            self.child_directories[name] = child_proxy
-
-            child.persist_after_creation()
-            print(f"Directorio: {str(child_proxy)}")
-            return child_proxy
-        else:
-            raise IceDrive.ChildAlreadyExists(childName=name, path=self.getPath())
+            raise IceDrive.ChildNotExists(childName=target_name)
 
     def getFiles(self, current: Ice.Current = None) -> List[str]:
         return list(self.files.keys())
 
-    def linkFile(self, filename: str, blob_id: str, current: Ice.Current = None) -> None:
+    def linkFile(self, filename: str, blob_id: str, current=None):
         if filename not in self.files:
             self.files[filename] = blob_id
+            self.persist(filename, blob_id)
         else:
             raise IceDrive.FileAlreadyExists(filename=filename)
+
+    def save_directory_data(self, file_path=None, filename=None, blob_id=None):
+        # Utiliza la ruta proporcionada o la predeterminada si no se especifica
+        file_path = file_path or self.subdirectory_path
+
+        with open(file_path, 'r+') as file:
+            data = json.load(file)
+            data.setdefault('files', {})
+            files_representation = f"{filename} -> {blob_id}"
+            data['files'][filename] = files_representation
+            file.seek(0)
+            file.truncate()
+            json.dump(data, file, indent=2)
+
+    def persist(self, filename, blob_id):
+        if self.parent:
+            # Llama a save_directory_data con la ruta del subdirectorio
+            self.parent.save_directory_data(file_path=self.subdirectory_path, filename=filename, blob_id=blob_id)
 
 
 #Persistencia con JSON
@@ -146,21 +145,11 @@ class DirectoryService(IceDrive.DirectoryService):
             self.adapter.addWithUUID(Directory(name=directory_name, adapter=self.adapter))
         )
 
-        user_directory_path = os.path.join(os.getcwd(), 'Subdirectorios', f'{user}_info.json')
-        directory_info = {
-            'directory_info': {
-                user: {'root': str(new_proxy)}
-            }
-        }
-        with open(user_directory_path, 'w') as file:
-            json.dump(directory_info, file, indent=2)
-
         self.directories[user] = new_proxy
         self.persist_directory_info(user, new_proxy)
 
         return new_proxy
     
-
     def get_user_uuid(self, user):
         return str(uuid.uuid5(uuid.NAMESPACE_DNS, user))
 
@@ -175,22 +164,7 @@ class DirectoryService(IceDrive.DirectoryService):
         directory_info['directory_info'].setdefault(user, {})
         directory_info['directory_info'][user]['root'] = str(directory_proxy)
 
+
         # Guardar la información actualizada en el archivo JSON
         with open(file_path, 'w') as file:
             json.dump(directory_info, file, indent=2)
-
-    """def persist_directory_info(self, user, directory_proxy):
-        # Cargar la información existente
-        file_path = f'{user}_info.json'
-        if os.path.exists(file_path):
-            with open(file_path, 'r') as file:
-                directory_info = json.load(file)
-        else:
-            directory_info = {}
-
-        # Actualizar la información con el nuevo directorio
-        directory_info[user] = {'root': str(directory_proxy)}
-
-        # Guardar la información actualizada en el archivo JSON
-        with open(file_path, 'w') as file:
-            json.dump(directory_info, file, indent=2)"""

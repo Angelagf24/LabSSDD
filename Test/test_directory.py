@@ -61,6 +61,33 @@ def test_persistence(proxy):
 
             print(f"Prueba de persistencia exitosa para el usuario {user}")"""
 
+def test_persistence2(proxy):
+    with Ice.initialize(sys.argv) as communicator:
+        proxy_service = communicator.stringToProxy(proxy)
+        directory_service = IceDrive.DirectoryServicePrx.checkedCast(proxy_service)
+
+        user = "usuario1"
+        root_directory_proxy = directory_service.getRoot(user)
+
+        # Crear subdirectorio y archivos enlazados
+        subdirectory = "subdirectorio1_usuario1"
+        subdirectory_proxy = root_directory_proxy.createChild(subdirectory)
+        print(f"Subdirectorio creado: {str(subdirectory_proxy)}")
+        subdirectory_proxy.linkFile("archivo1.txt", "blob1")
+        subdirectory_proxy.linkFile("archivo2.txt", "blob2")
+        files = subdirectory_proxy.getFiles()
+        print(f"Archivos del {user} : {files}")
+
+        subdirectorio = subdirectory_proxy.getChild(subdirectory)
+        print(f"Subdirectorio de {user}: {subdirectorio}")
+
+        # Recuperar el directorio después de la persistencia
+        recovered_root_directory_proxy = directory_service.getRoot(user)
+
+        # Verificar la persistencia de subdirectorios
+        subdirectories = recovered_root_directory_proxy.getChilds()
+        print(f"Directorios hijos del raíz: {subdirectories}")
+
 
 if __name__ == '__main__':
 
@@ -69,4 +96,4 @@ if __name__ == '__main__':
         sys.exit(1)
     
     proxy = sys.argv[1]
-    test_persistence(proxy)
+    test_persistence2(proxy)

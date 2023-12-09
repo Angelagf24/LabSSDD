@@ -20,6 +20,12 @@ class Directory(IceDrive.Directory):
         self.files = {}  # Agrega este atributo
         self.parent = parent  # Incluye el argumento parent
         self.subdirectory_path = None
+        self.child_uuids = {}
+
+    def getParent(self, current: Ice.Current = None) -> IceDrive.DirectoryPrx:
+        if not self.parent:
+            raise IceDrive.RootHasNoParent()
+        return self.parent
 
     def get_name_uuid(self, name):
         return str(uuid.uuid5(uuid.NAMESPACE_DNS, name))
@@ -38,6 +44,7 @@ class Directory(IceDrive.Directory):
             raise IceDrive.ChildAlreadyExists(childName=name, path=self.getPath())
 
         self.child_directories[name] = child_proxy
+        self.child_uuids[name] = subdirectory_uuid
 
         self.persist_subdirectory_info(child, child_proxy, name)
 
@@ -102,6 +109,36 @@ class Directory(IceDrive.Directory):
             # Llama a save_directory_data con la ruta del subdirectorio
             self.parent.save_directory_data(file_path=self.subdirectory_path, filename=filename, blob_id=blob_id)
 
+    def getPath(self, current: Ice.Current = None) -> str:
+        # Este método podría retornar la ruta del directorio actual
+        # Puedes personalizarlo según tus necesidades
+        # Aquí se muestra una posible implementación básica
+        path = self.name
+        current_directory = self.parent
+
+        while current_directory:
+            path = os.path.join(current_directory.name, path)
+            current_directory = current_directory.parent
+
+        return path
+        
+    def removeChild(self, name: str, current: Ice.Current = None) -> None:
+        if name in self.child_directories:
+            child_proxy = self.child_directories.pop(name)
+            subdirectory_uuid = self.get_name_uuid(name)
+            subdirectory_name = f"{subdirectory_uuid}"
+            self.child_uuids.pop(subdirectory_name, None)  
+            self.remove_subdirectory_info(name)
+            print(f"Subdirectorio '{name}' eliminado con éxito.")
+        else:
+            raise IceDrive.ChildNotExists(childName=name, path=self.getPath())
+    
+    def remove_subdirectory_info(self, name):
+        directory_path = os.path.join('Subdirectorios', f'{name}_info.json')
+        if os.path.exists(directory_path):
+            os.remove(directory_path)
+
+    
 
 #Persistencia con JSON
 class DirectoryService(IceDrive.DirectoryService):

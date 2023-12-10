@@ -47,8 +47,7 @@ Clona el repositorio de IceDrive en tu máquina local utilizando:
 git clone https://github.com/Angelagf24/LabSSDD
 
 He decidido que la Tarea 1 del laboratorio esté hecho en una rama y la Tarea 2 en otra rama. 
-Por lo que para la instalación hay que descargarse el contenido de la siguiente rama:
-Rama: Entrega_Tarea1
+La tarea 1 está en la rama "directorio", he pasado mis cambios locales a la rama origin/directorio y ya he hecho un merge con la rama main.   
 
 Ahora hay que ejecutar lo siguiente para lanzar el servidor:
 pip3 install .

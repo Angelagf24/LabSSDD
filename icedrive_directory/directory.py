@@ -15,10 +15,10 @@ class Directory(IceDrive.Directory):
         self.name = name
         self.adapter = adapter
         self.proxy = proxy
-        self.child_directories = {}  # Directorios hijos
-        self.linked_files = {}  # Archivos enlazados
-        self.files = {}  # Agrega este atributo
-        self.parent = parent  # Incluye el argumento parent
+        self.child_directories = {}  
+        self.linked_files = {}  
+        self.files = {}  
+        self.parent = parent 
         self.subdirectory_path = None
         self.child_uuids = {}
         self.parent_proxy = parent_proxy
@@ -47,6 +47,9 @@ class Directory(IceDrive.Directory):
             print(f"Ese directorio '{name}' ya existe.")
             raise IceDrive.ChildAlreadyExists(childName=name, path=self.getPath())
         
+        print(f"Subdirectorio creado: {str(child_proxy)}")
+        print(f"Detalles del subdirectorio: {subdirectory_uuid}")
+
         self.parent_proxy = child.proxy
 
         self.child_directories[name] = child_proxy
@@ -78,17 +81,22 @@ class Directory(IceDrive.Directory):
 
     
     def getChilds(self, current: Ice.Current = None) -> List[str]:
-        return list(self.child_directories.keys())
+        child_names = list(self.child_directories.keys())
+        print(f"Directorios hijos del raíz: {child_names}")
+        return child_names
     
     def getChild(self, target_name: str, current: Ice.Current = None) -> IceDrive.DirectoryPrx:
         if target_name in self.child_directories:
             proxy = IceDrive.DirectoryPrx.checkedCast(self.child_directories[target_name])
+            print(f"Subdirectorio del {target_name}: {proxy}")
             return proxy
         else:
             raise IceDrive.ChildNotExists(childName=target_name)
 
     def getFiles(self, current: Ice.Current = None) -> List[str]:
-        return list(self.files.keys())
+        files = list(self.files.keys())
+        print(f"Archivos: {files}")
+        return files
     
     def save_directory_data(self, file_path=None, filename=None, blob_id=None):
         # Utiliza la ruta proporcionada o la predeterminada si no se especifica
@@ -110,6 +118,7 @@ class Directory(IceDrive.Directory):
 
     def linkFile(self, filename: str, blob_id: str, current=None):
         if filename not in self.files:
+            print(f"{filename} --> {blob_id}")
             self.files[filename] = blob_id
             self.persist(filename, blob_id)
         else:
@@ -117,6 +126,7 @@ class Directory(IceDrive.Directory):
         
     def unlinkFile(self, filename: str, current: Ice.Current = None) -> None:
         if filename in self.files:
+            print(f"Archivo {filename} eliminado con éxito")
             del self.files[filename]
             self.persistUnLink(filename)
         else:
@@ -151,7 +161,6 @@ class Directory(IceDrive.Directory):
 
 
     def getPath(self, current: Ice.Current = None) -> str:
-        # Este método podría retornar la ruta del directorio actual
         path = self.name
         current_directory = self.parent
 
@@ -212,6 +221,7 @@ class DirectoryService(IceDrive.DirectoryService):
             stored_proxy = IceDrive.DirectoryPrx.uncheckedCast(self.communicator.stringToProxy(stored_proxy_str))
             self.directories[user] = stored_proxy
             print(f"El usuario '{user}' ya tiene un directorio registrado en el archivo JSON.")
+            print(f"Su directorio es: {stored_proxy}")
             return stored_proxy
 
         # Si el usuario no tiene un directorio registrado, crear uno nuevo
@@ -219,6 +229,8 @@ class DirectoryService(IceDrive.DirectoryService):
         new_proxy = IceDrive.DirectoryPrx.uncheckedCast(
             self.adapter.addWithUUID(Directory(name=directory_name, adapter=self.adapter))
         )
+
+        print(f"El directorio raíz de {user} es: {new_proxy}")
 
         self.directories[user] = new_proxy
         self.persist_directory_info(user, new_proxy)

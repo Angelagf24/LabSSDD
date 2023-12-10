@@ -33,7 +33,7 @@ def test_persistence_subdirectorios(proxy):
         print(f"Directorio raíz para {user}: {str(root_directory_proxy)}")
 
         # Crear subdirectorio y archivos enlazados
-        subdirectory = "subdirectorio1_usuario1"
+        subdirectory = f"subdirectorio1_{user}"
         subdirectory_proxy = root_directory_proxy.createChild(subdirectory)
         print(f"Subdirectorio creado: {str(subdirectory_proxy)}")
         subdirectory_proxy.linkFile("archivo1.txt", "blob1")
@@ -64,7 +64,7 @@ def test_persistence_borrado(proxy):
         root_directory_proxy = directory_service.getRoot(user)
         print(f"Directorio raíz para {user}: {str(root_directory_proxy)}")
 
-        subdirectory = "subdirectorio1_usuario1"
+        subdirectory = f"subdirectorio1_{user}"
         root_directory_proxy.removeChild(subdirectory)
         print(f"Subdirectorio '{subdirectory}' eliminado con éxito")
 
@@ -78,7 +78,7 @@ def test_persistence_unLink(proxy):
             print(f"Directorio raíz para {user}: {str(root_directory_proxy)}")
 
             # Crear subdirectorio y archivos enlazados
-            subdirectory = "subdirectorio1_usuario1"
+            subdirectory = f"subdirectorio1_{user}"
             subdirectory_proxy = root_directory_proxy.createChild(subdirectory)
             print(f"Subdirectorio creado: {str(subdirectory_proxy)}")
             subdirectory_proxy.linkFile("archivo1.txt", "blob1")
@@ -104,7 +104,7 @@ def test_persistence_getParent(proxy):
             parent_directory_root_proxy = root_directory_proxy.getParent()
             print(f"Directorio superior: {str(parent_directory_root_proxy)}")
 
-            subdirectory = "subdirectorio1_usuario1"
+            subdirectory = f"subdirectorio1_{user}"
             subdirectory_proxy = root_directory_proxy.createChild(subdirectory)
             print(f"Subdirectorio creado: {str(subdirectory_proxy)}")
             parent_subdirectory_proxy = subdirectory_proxy.getParent()
@@ -124,4 +124,3 @@ if __name__ == '__main__':
     #test_persistence_unLink(proxy)
     #test_persistence_getParent(proxy)
 
-    

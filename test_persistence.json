@@ -2,7 +2,9 @@
     "root_directories": {
         "new_user": "1e4122a6-be7d-41c3-b99e-22aa4dd7c384",
         "angela": "45cf0035-209e-448e-a85b-87e4345edf27",
-        "Angela": "068e2089-7c54-437b-bafa-b9071cbfc0dc"
+        "Angela": "068e2089-7c54-437b-bafa-b9071cbfc0dc",
+        "user": "083f8858-7a6c-48e3-8895-f4d366077e82",
+        "Alejandro": "112d018a-2d96-44c6-80e8-8273ce314939"
     },
     "directories": {
         "1e4122a6-be7d-41c3-b99e-22aa4dd7c384": {
@@ -54,6 +56,14 @@
             "files": {
                 "archivo1.txt": "12378404388338fehj89jdj02"
             },
+            "subdirs": {}
+        },
+        "083f8858-7a6c-48e3-8895-f4d366077e82": {
+            "files": {},
+            "subdirs": {}
+        },
+        "112d018a-2d96-44c6-80e8-8273ce314939": {
+            "files": {},
             "subdirs": {}
         }
     }

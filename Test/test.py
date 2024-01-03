@@ -2,7 +2,6 @@ import Ice
 
 import os
 import sys
-import unittest
 
 ruta_actual = os.path.dirname(os.path.abspath(__file__))
 ruta_iceDrive = os.path.abspath(os.path.join(ruta_actual, "..", "icedrive_directory"))
@@ -128,8 +127,8 @@ if __name__ == '__main__':
     
     proxy = sys.argv[1]
     
-    #test_getRoot_new_user(proxy)
-    test_createChild(proxy)
+    test_getRoot_new_user(proxy)
+    #test_createChild(proxy)
     #test_getParent(proxy)
     #test_getChilds(proxy)
     #test_getChilds_empty(proxy)

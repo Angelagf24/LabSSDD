@@ -4,14 +4,26 @@ import Ice
 
 import IceDrive
 
+import logging
 
 class DirectoryQueryResponse(IceDrive.DirectoryQueryResponse):
-    """Query response receiver."""
-    def rootDirectoryResponse(self, root: IceDrive.DirectoryPrx, current: Ice.Current = None) -> None:
-        """Receive a Directory when other service instance knows the user."""
+    def __init__(self):
+        self.response = False
+        self.root = None
 
+    def rootDirectoryResponse(self, root: IceDrive.DirectoryPrx, current: Ice.Current = None) -> None:
+        self.response = True
+        self.root = root
 
 class DirectoryQuery(IceDrive.DirectoryQuery):
-    """Query receiver."""
+    def __init__(self, service):
+        self.service = service
+
     def rootDirectory(self, user: IceDrive.UserPrx, response: IceDrive.DirectoryQueryResponsePrx, current: Ice.Current = None) -> None:
-        """Receive a query about the user's root directory."""
+        logging.info("rootDirectory")
+        root = self.service.getRoot(user)
+        if root is not None:
+            response.rootDirectoryResponse(root)
+        else:
+            print("No se pudo obtener el root")
+        

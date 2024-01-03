@@ -1,8 +1,11 @@
 """Module for servants implementations."""
 
 from typing import List
+import time
+import logging
 
-from icedrive_directory.persistence import DirectoryPersistence
+from persistence import DirectoryPersistence
+from delayed_response import DirectoryQueryResponse
 
 import Ice
 
@@ -66,6 +69,7 @@ class DirectoryService(IceDrive.DirectoryService):
     def __init__(self, persistence, discovery):
         self.persistence = persistence
         self.discovery = discovery
+        self.directoryQuery = None
     
     def getRoot(self, user: IceDrive.User, current: Ice.Current = None) -> IceDrive.DirectoryPrx:
         # Verificar que el proxy User es válido
@@ -81,13 +85,39 @@ class DirectoryService(IceDrive.DirectoryService):
             raise IceDrive.Unauthorized("User is not alive")
 
         # Obtener el UUID del directorio raíz del usuario
-        user_id = user.getUsername()  
-        directory_uuid = self.persistence.get_directory_for_user(user_id)
-
-        # Crear la instancia de Directory y el proxy
-        servant = Directory(directory_uuid, self.persistence)
-        new_proxy = IceDrive.DirectoryPrx.uncheckedCast(
-            current.adapter.addWithUUID(servant)
-        )
+        user_id = user.getUsername() 
         
-        return new_proxy
+        #Comprobar si existe:
+        if self.persistence.exist_user(user_id):
+            directory_uuid = self.persistence.get_directory_for_user(user_id)
+
+            # Crear la instancia de Directory y el proxy
+            servant = Directory(directory_uuid, self.persistence)
+            new_proxy = IceDrive.DirectoryPrx.uncheckedCast(
+                current.adapter.addWithUUID(servant)
+            )
+
+            return new_proxy
+        else:
+            response = DirectoryQueryResponse()
+            response_prx = IceDrive.DirectoryQueryResponsePrx.uncheckedCast(
+                current.adapter.addWithUUID(response)
+            )
+            self.directoryQuery.rootDirectory(user, response_prx)
+            starTime = time.time()
+            while not response.response and time.time() - starTime < 5: # 5 segundos
+                time.sleep(0.1)
+            if response.response:
+                new_proxy = response.root
+                return new_proxy
+            else: 
+                logging.info("Se ha superado el tiempo de espera")
+                directory_uuid = self.persistence.get_directory_for_user(user_id)
+
+                # Crear la instancia de Directory y el proxy
+                servant = Directory(directory_uuid, self.persistence)
+                new_proxy = IceDrive.DirectoryPrx.uncheckedCast(
+                    current.adapter.addWithUUID(servant)
+                )
+
+                return new_proxy

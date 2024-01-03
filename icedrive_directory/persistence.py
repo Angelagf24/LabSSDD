@@ -29,6 +29,10 @@ class DirectoryPersistence:
         
         return self.directories["root_directories"][username]
     
+    #Devuelve True si existe
+    def exist_user(self, username):
+        return username in self.directories["root_directories"]
+    
     def get_subdirs_for_dir(self, parent_dir):
         if parent_dir not in self.directories["directories"]:
             raise Exception()

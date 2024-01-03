@@ -1,0 +1,60 @@
+{
+    "root_directories": {
+        "new_user": "1e4122a6-be7d-41c3-b99e-22aa4dd7c384",
+        "angela": "45cf0035-209e-448e-a85b-87e4345edf27",
+        "Angela": "068e2089-7c54-437b-bafa-b9071cbfc0dc"
+    },
+    "directories": {
+        "1e4122a6-be7d-41c3-b99e-22aa4dd7c384": {
+            "files": {},
+            "subdirs": {}
+        },
+        "45cf0035-209e-448e-a85b-87e4345edf27": {
+            "files": {},
+            "subdirs": {
+                "subdirectorio2_angela": "17afaf5a-3933-4c2e-97ba-d4f27c56fcd2",
+                "subdirectorio3_angela": "3a50376e-5a71-4c82-81e3-333299939d3e",
+                "subdirectorio_angela": "0a6f9e3d-d660-44d8-8d01-1ae9a3566cc8",
+                "subdirectorio1_angela": "abdaf82f-7252-4a8d-81e9-1b84ccde1b55"
+            }
+        },
+        "17afaf5a-3933-4c2e-97ba-d4f27c56fcd2": {
+            "files": {},
+            "subdirs": {}
+        },
+        "3a50376e-5a71-4c82-81e3-333299939d3e": {
+            "files": {},
+            "subdirs": {}
+        },
+        "0a6f9e3d-d660-44d8-8d01-1ae9a3566cc8": {
+            "files": {
+                "archivo2.txt": "blob2"
+            },
+            "subdirs": {}
+        },
+        "abdaf82f-7252-4a8d-81e9-1b84ccde1b55": {
+            "files": {
+                "archivo1.txt": "blob1"
+            },
+            "subdirs": {
+                "subsubdirectorio1_angela": "a6564dec-ede8-495b-bca8-0e6f8953b081"
+            }
+        },
+        "a6564dec-ede8-495b-bca8-0e6f8953b081": {
+            "files": {},
+            "subdirs": {}
+        },
+        "068e2089-7c54-437b-bafa-b9071cbfc0dc": {
+            "files": {},
+            "subdirs": {
+                "subdirectorio_Angela": "817f39cb-3c39-400e-9cdb-a1e1747c4764"
+            }
+        },
+        "817f39cb-3c39-400e-9cdb-a1e1747c4764": {
+            "files": {
+                "archivo1.txt": "12378404388338fehj89jdj02"
+            },
+            "subdirs": {}
+        }
+    }
+}

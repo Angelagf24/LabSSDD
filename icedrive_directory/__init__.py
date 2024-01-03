@@ -6,7 +6,6 @@ import os
 
 import Ice
 
-
 logging.basicConfig(level=logging.DEBUG)
 
 if importlib.util.find_spec("IceDrive") is None:

@@ -4,7 +4,6 @@ from typing import List
 import time
 import logging
 
-from persistence import DirectoryPersistence
 from delayed_response import DirectoryQueryResponse
 
 import Ice

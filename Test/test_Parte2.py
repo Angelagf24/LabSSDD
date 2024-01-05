@@ -20,6 +20,8 @@ from persistence import DirectoryPersistence
 from discovery import Discovery
 from delayed_response import DirectoryQuery
 
+logging.basicConfig(level=logging.INFO)
+
 class User(IceDrive.User):
     def __init__(self, name):
         self.name = name
@@ -56,46 +58,55 @@ class Authentication(IceDrive.Authentication):
 def iniciar_testing():
     with Ice.initialize(sys.argv) as communicator:
         adapter_auth = communicator.createObjectAdapterWithEndpoints("AuthenticationService", "tcp -h localhost -p 10004")
-        adapter_auth.activate()
-
-        auth = Authentication()
-        servant_auth = adapter_auth.addWithUUID(auth)
-        servant_proxy_auth = IceDrive.AuthenticationPrx.uncheckedCast(servant_auth)
+        adapter_auth.activate() 
 
         adapter_directory = communicator.createObjectAdapterWithEndpoints("DirectoryService", "tcp -h localhost -p 10005")
-        adapter_directory.activate()
-        persistence = DirectoryPersistence('../test_persistence.json')
-        discovery = Discovery(str(uuid.uuid4()))
-        discoveryprx = adapter_directory.addWithUUID(discovery)
-        servant_directory = DirectoryService(persistence=persistence, discovery=discovery)
-        servantprx_directory = adapter_directory.addWithUUID(servant_directory)
-        servant_proxy_directory = IceDrive.DirectoryServicePrx.uncheckedCast(servantprx_directory)
+        adapter_directory.activate() 
+
+        adapter_directory_1 = communicator.createObjectAdapterWithEndpoints("DirectoryService1", "tcp -h localhost -p 10006")
+        adapter_directory_1.activate() 
+
+        auth = Authentication()
+        servant_auth = adapter_auth.addWithUUID(auth) 
+        servant_proxy_auth = IceDrive.AuthenticationPrx.uncheckedCast(servant_auth) 
+
+        discovery = Discovery(str(uuid.uuid4())) #discovery
 
         discovery.announceAuthentication(servant_proxy_auth)
 
-        query = DirectoryQuery(servant_proxy_directory)
-        queryprx = adapter_directory.addWithUUID(query)
-        query_proxy = IceDrive.DirectoryQueryPrx.uncheckedCast(queryprx)
-        topic_manager = communicator.propertyToProxy("IceStorm.TopicManager.Proxy")
-        topic_manager = IceStorm.TopicManagerPrx.checkedCast(topic_manager)
-        topic = topic_manager.retrieve("directory")
-        publisher = topic.getPublisher()
-        publisherprx = IceDrive.DirectoryQueryPrx.uncheckedCast(publisher)
-        servant_directory.directoryQuery = publisherprx
+        persistence = DirectoryPersistence('../test_persistence.json') 
+        servant_directory = DirectoryService(persistence=persistence, discovery=discovery) 
+        servantprx_directory = adapter_directory.addWithUUID(servant_directory) 
+        servant_proxy_directory = IceDrive.DirectoryServicePrx.uncheckedCast(servantprx_directory) 
 
-        adapter_directory_1 = communicator.createObjectAdapterWithEndpoints("DirectoryService1", "tcp -h localhost -p 10006")
-        adapter_directory_1.activate()
         persistence_1 = DirectoryPersistence('./test_persistence.json')
         servant_directory_1 = DirectoryService(persistence=persistence_1, discovery=discovery)
         servantprx_directory_1 = adapter_directory_1.addWithUUID(servant_directory_1)
         servant_proxy_directory_1 = IceDrive.DirectoryServicePrx.uncheckedCast(servantprx_directory_1)
 
-        servant_directory_1.directoryQuery = publisherprx
+        query = DirectoryQuery(servant_proxy_directory) 
 
+        queryprx = adapter_directory.addWithUUID(query) 
+        query_proxy = IceDrive.DirectoryQueryPrx.checkedCast(queryprx) 
+        
+        topic_manager = communicator.propertyToProxy("IceStorm.TopicManager.Proxy") 
+        topic_manager = IceStorm.TopicManagerPrx.checkedCast(topic_manager)
+        try:
+            topic = topic_manager.retrieve("directory")
+        except IceStorm.NoSuchTopic:
+            topic = topic_manager.create("directory")
+
+        publisher = topic.getPublisher().ice_oneway()
+        publisherprx = IceDrive.DirectoryQueryPrx.uncheckedCast(publisher)
+
+        servant_directory.directoryQuery = publisherprx
+        servant_directory_1.directoryQuery = publisherprx    
+        
         topic.subscribeAndGetPublisher({}, query_proxy)
 
         user = comprobar_VerifyUser(servant_proxy_auth)
         comprobar_GetRoot(servant_proxy_directory, user)
+        
         comprobar_diferido(servant_proxy_directory_1, user)
 
         communicator.waitForShutdown()
@@ -108,12 +119,12 @@ def comprobar_VerifyUser(servant_proxy):
 
 #Test pasado con éxito: si pasamos un objeto usuario crea un directorio raíz para ese usuario
 def comprobar_GetRoot(servant_proxy, user):
-    #print(servant_proxy.getRoot(user))
     assert servant_proxy.getRoot(user) != None
 
 def comprobar_diferido(servant_proxy, user):
-    #print(servant_proxy.getRoot(user))
-    assert servant_proxy.getRoot(user) != None
+    variable = servant_proxy.getRoot(user)
+    print(variable)
+    assert variable != None
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:

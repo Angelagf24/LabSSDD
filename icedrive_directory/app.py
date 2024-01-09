@@ -11,10 +11,12 @@ import Ice
 import IceDrive
 import IceStorm
 
-from .directory import DirectoryService
-from .persistence import DirectoryPersistence
-from .discovery import Discovery
-from .delayed_response import DirectoryQuery
+#sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from directory import DirectoryService
+from persistence import DirectoryPersistence
+from discovery import Discovery
+from delayed_response import DirectoryQuery
 
 class DirectoryApp(Ice.Application):
     """Implementation of the Ice.Application for the Authentication service."""

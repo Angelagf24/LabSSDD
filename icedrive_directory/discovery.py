@@ -22,8 +22,8 @@ class Discovery(IceDrive.Discovery):
     def announceDirectoryService(self, prx: IceDrive.DirectoryServicePrx, current: Ice.Current = None) -> None:
         id= self.servicios_registrado.get(prx)
         if id is None:
-            if prx not in self.blob_service:
-                self.blob_service.append(prx)
+            if prx not in self.directory_service:
+                self.directory_service.append(prx)
                 print(f"Directory service announced and added: {prx}")
 
     def announceBlobService(self, prx: IceDrive.BlobServicePrx, current: Ice.Current = None) -> None:

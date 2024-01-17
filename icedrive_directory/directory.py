@@ -1,19 +1,22 @@
 """Module for servants implementations."""
 
 from typing import List
-import time
 import logging
+import time
+import sys
+import os
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from delayed_response import DirectoryQueryResponse
 
 import Ice
-
 import IceDrive
 
 class Directory(IceDrive.Directory):
-    def __init__(self, name, persistence):
+    def __init__(self, name, persistence, discovery):
         self.name = name
         self.persistence = persistence
+        self.discovery = discovery
 
     def getPath(self, current: Ice.Current = None) -> str:
         return self.persistence.get_path_for_dir(self.name)
@@ -53,6 +56,7 @@ class Directory(IceDrive.Directory):
     
     def getBlobId(self, filename: str, current: Ice.Current = None) -> str:
         blob_id = self.persistence.get_blob_id_for_file(self.name, filename)
+
         if blob_id is None:
             raise IceDrive.FileNotFound(filename=filename) 
         return blob_id
@@ -60,9 +64,35 @@ class Directory(IceDrive.Directory):
     def linkFile(self, filename: str, blob_id: str, current: Ice.Current = None) -> None:
         self.persistence.link_file_to_dir(self.name, filename, blob_id)
 
+        prxBlob = self.discovery.getBlobService()
+
+        if prxBlob is None: 
+            raise IceDrive.TemporaryUnavailable("Blob service")
+
+        try:
+            prxBlob.link(blob_id)
+        except ConnectionError:
+            self.discovery.blob_service.remove(prxBlob)
+        except IceDrive.UnknownBlob:
+            pass
+
     def unlinkFile(self, filename: str, current: Ice.Current = None) -> None:
+        blob_id = self.getBlobId(filename)
+        
         if not self.persistence.unlink_file_from_dir(self.name, filename):
             raise IceDrive.FileNotFound(filename=filename)
+
+        prxBlob = self.discovery.getBlobService()
+
+        if prxBlob is None:
+            raise IceDrive.TemporaryUnavailable("Blob service")
+
+        try:
+            prxBlob.unlink(blob_id)
+        except ConnectionError:
+            self.discovery.blob_service.remove(prxBlob)
+        except IceDrive.UnknownBlob:
+            pass
 
 class DirectoryService(IceDrive.DirectoryService):
     def __init__(self, persistence, discovery):
@@ -73,15 +103,18 @@ class DirectoryService(IceDrive.DirectoryService):
     def getRoot(self, user: IceDrive.User, current: Ice.Current = None) -> IceDrive.DirectoryPrx:
         # Verificar que el proxy User es válido
         prxAutenticacion = self.discovery.getAuthenticationService()
-        if not prxAutenticacion:
-            raise Exception("No hay servicio de autenticación")
+        if prxAutenticacion is None:
+            raise IceDrive.TemporaryUnavailable("Authentication service")
 
-        if not prxAutenticacion.verifyUser(user):
-            raise IceDrive.Unauthorized("User is not valid")
-        
-        # Comprobar si el usuario está vivo
-        if not user.isAlive():
-            raise IceDrive.Unauthorized("User is not alive")
+        try:
+            if not prxAutenticacion.verifyUser(user):
+                raise IceDrive.Unauthorized("User is not valid")
+            
+            # Comprobar si el usuario está vivo
+            if not user.isAlive():
+                raise IceDrive.Unauthorized("User is not alive")
+        except ConnectionError:
+            self.discovery.authentication_service.remove(prxAutenticacion)
 
         # Obtener el UUID del directorio raíz del usuario
         user_id = user.getUsername() 
@@ -91,7 +124,7 @@ class DirectoryService(IceDrive.DirectoryService):
             directory_uuid = self.persistence.get_directory_for_user(user_id)
 
             # Crear la instancia de Directory y el proxy
-            servant = Directory(directory_uuid, self.persistence)
+            servant = Directory(directory_uuid, self.persistence, self.discovery)
             new_proxy = IceDrive.DirectoryPrx.uncheckedCast(
                 current.adapter.addWithUUID(servant)
             )
@@ -102,21 +135,21 @@ class DirectoryService(IceDrive.DirectoryService):
             response_prx = IceDrive.DirectoryQueryResponsePrx.uncheckedCast(
                 current.adapter.addWithUUID(response)
             )
+
             self.directoryQuery.rootDirectory(user, response_prx)
+
             starTime = time.time()
             while not response.response and time.time() - starTime < 5: # 5 segundos
                 time.sleep(0.1)
+
             if response.response:
                 new_proxy = response.root
                 return new_proxy
             else: 
                 logging.info("Se ha superado el tiempo de espera")
-                directory_uuid = self.persistence.get_directory_for_user(user_id)
-
-                # Crear la instancia de Directory y el proxy
-                servant = Directory(directory_uuid, self.persistence)
+                directory_uuid = self.persistence.get_directory_for_user(user.getUsername())
+                servant = Directory(directory_uuid, self.persistence, self.discovery)
                 new_proxy = IceDrive.DirectoryPrx.uncheckedCast(
                     current.adapter.addWithUUID(servant)
                 )
-
                 return new_proxy

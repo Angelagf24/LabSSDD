@@ -11,12 +11,10 @@ import Ice
 import IceDrive
 import IceStorm
 
-#sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from directory import DirectoryService
-from persistence import DirectoryPersistence
-from discovery import Discovery
-from delayed_response import DirectoryQuery
+from .directory import DirectoryService
+from .persistence import DirectoryPersistence
+from .discovery import Discovery
+from .delayed_response import DirectoryQuery
 
 class DirectoryApp(Ice.Application):
     """Implementation of the Ice.Application for the Authentication service."""
@@ -75,7 +73,6 @@ class DirectoryApp(Ice.Application):
     
     def start_announcing(self, publisher_prx, servant_proxy, discovery, unique_id):
         while True:
-            #print("Anunciando con publisher proxy")
             discovery.servicios_registrado[servant_proxy] = unique_id
             publisher_prx.announceDirectoryService(servant_proxy)
             time.sleep(5)

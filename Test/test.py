@@ -136,6 +136,3 @@ if __name__ == '__main__':
     #test_removeChild(proxy)
     #test_linkFile(proxy)
     #test_unlinkFile_and_getFiles_and_getBlobId(proxy)
-
-
-
